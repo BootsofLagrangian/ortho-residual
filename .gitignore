@@ -1,0 +1,35 @@
+
+__pycache__
+*.pyc
+*.pyo
+tmp/
+temp/
+
+## byproducts
+checkpoints/
+data/
+dataset/
+logs/
+wandb/
+results/
+results-classifier/
+samples/
+exp/
+
+## Ignore all archives
+*.tar.gz
+*.tar
+
+## Ignore all log files
+*.out
+*.err
+*.log
+
+*.json
+*.jsonl
+*.csv
+
+*.safetensors
+*.ckpt
+*.pth
+*.pt

@@ -1,0 +1,32 @@
+project: ortho-classifier
+dataset: tiny-imagenet
+
+# model
+# orthogonal_residual: true # set this to true if you want to use orthogonal residuals
+
+# optimization
+optimizer: sgd
+momentum: 0.9
+global_batch_size: 128
+grad_accumulate_steps: 1
+lr: 1.0e-1
+weight_decay: 0.0005
+epochs: 200
+warmup_epoch: 0
+lr_scheduler_type: step
+lr_scheduler_decay_epoch: 80,120
+lr_scheduler_decay_ratio: 0.2
+grad_clip: 1.0
+
+# regularisation & aug
+use_mixup: false
+mixup_alpha: 0.8
+cutmix_alpha: 1.0
+mixup_prob: 1.0
+label_smoothing: 0.0
+random_erase: 0.0
+randaugment_N: 0
+randaugment_M: 0
+
+log_activations: true
+log_interval: 100

@@ -1,0 +1,36 @@
+project:          ortho-classifier
+model:            vit
+dataset:          imagenet1k
+preset:           B                # ViT-Base (dim=768, depth=12, heads=12)
+# orthogonal_residual: true # set this to true if you want to use orthogonal residuals
+
+# batch & epochs
+global_batch_size: 4096
+grad_accumulate_steps: 2
+epochs:            300
+warmup_epoch:      10
+
+# optimiser / sched
+optimizer:         adam
+lr:                5.0e-4
+weight_decay:      0.0001
+adam_beta1:        0.9
+adam_beta2:        0.999
+lr_scheduler_type: cos
+grad_clip:
+
+# regularisation
+label_smoothing:   0.1
+use_mixup:         true
+mixup_alpha:       0.8
+cutmix_alpha:      1.0
+mixup_prob:        1.0
+drop_path:         0.0
+random_erase:      0.25
+randaugment_N:     9
+randaugment_M:     9
+
+mlp_dropout:       0.0
+
+torch_compile: true
+log_activations: true
