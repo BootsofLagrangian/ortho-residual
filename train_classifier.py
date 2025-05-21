@@ -459,6 +459,7 @@ def main(args):
             
             if perform_step:
                 # Scale the gradients properly if we're at the last batch with incomplete accumulation
+                scale_factor = 1.0
                 if is_last_batch and current_accum < accum_steps:
                     # Rescale the gradients to match what they would have been with full accumulation
                     scale_factor = accum_steps / current_accum
@@ -513,10 +514,11 @@ def main(args):
                     samples_per_sec = log_steps * local_batch_size * dist.get_world_size() / (end_time - start_time)
 
                     # Calculate average loss across all processes
-                    avg_loss = torch.tensor(running_loss / log_steps, device=device)
-                    dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
-                    avg_loss = avg_loss.item() / dist.get_world_size()
-                    
+                    optimizer_loss = torch.tensor(running_loss / log_steps, device=device)
+                    dist.all_reduce(optimizer_loss, op=dist.ReduceOp.SUM)
+                    optimizer_loss = optimizer_loss.item() / dist.get_world_size()
+                    micro_batch_loss = (optimizer_loss / accum_steps)
+
                     # Collect model stats if available
                     stats = None
                     buf_log = {}
@@ -533,7 +535,8 @@ def main(args):
 
                         logger.info(
                             f"(step={train_steps:07d}) " \
-                            f"Train Loss: {avg_loss:.4f} " \
+                            f"Train Optimizer Loss: {optimizer_loss:.4f} " \
+                            f"Train Micro Batch Loss: {micro_batch_loss:.4f} " \
                             f"Train Steps/Sec: {steps_per_sec:.2f} " \
                             f"Train Samples/Sec: {samples_per_sec:.1f}"
                         )
@@ -541,7 +544,8 @@ def main(args):
                         # Log training metrics to a separate table in wandb
                         wandb.log(
                             {
-                                "train/loss": avg_loss,
+                                "train/optimizer_loss": optimizer_loss,
+                                "train/micro_batch_loss": micro_batch_loss,
                                 "train/step": train_steps,
                                 "train/lr": lr_scheduler.get_last_lr()[0],
                                 "train/samples_per_sec": samples_per_sec,
