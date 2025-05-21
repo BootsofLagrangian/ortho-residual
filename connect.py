@@ -113,11 +113,11 @@ def _orthogonal_global(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: torch.
     return f_ortho, results
 
 def connect(x: torch.Tensor, f_x: torch.Tensor, *, 
-            method="identity", orthogonal_method="global",
+            method="linear", orthogonal_method="global",
             dim=-1, eps=1e-6, perturbation=None) -> Tuple[torch.Tensor, RawConnStat]:
     if perturbation is not None:
         f_x = f_x + torch.randn_like(f_x) * perturbation
-    if method == "identity":
+    if method == "linear":
         stream = x + f_x
         results = RawConnStat(
             dim=dim,
@@ -204,17 +204,17 @@ def set_connect(
     module: torch.nn.Module,
     pattern: Optional[Sequence[int]] = None,
     prob: Optional[float] = None,
-    default: str = "identity",
+    default: str = "linear",
     logger: Optional[logging.Logger] = None,
 ):
     """
-    Walk `module`, locate all sub‐modules that support an orthogonal/identity connect_method
+    Walk `module`, locate all sub‐modules that support an orthogonal/linear connect_method
     (either via `.connect_method` or a `._res_kwargs['method']` or `.residual_kwargs['method']`),
     and set each one’s method.
 
     Args:
         module:   root module to search (e.g. your ViT or ResNet).
-        pattern:  if given, a list of block indices that should be 'orthogonal'; all others become 'identity'.
+        pattern:  if given, a list of block indices that should be 'orthogonal'; all others become 'linear'.
         prob:     if given (and pattern is None), for each block choose 'orthogonal' with this probability.
         default:  fallback method when neither pattern nor prob is set.
         logger:   optional logger to record which block gets which method.
@@ -228,9 +228,9 @@ def set_connect(
     for idx, blk in enumerate(blocks):
         # decide method for this block
         if pattern is not None:
-            method = "orthogonal" if idx in pattern else "identity"
+            method = "orthogonal" if idx in pattern else "linear"
         elif prob is not None:
-            method = "orthogonal" if random.random() < prob else "identity"
+            method = "orthogonal" if random.random() < prob else "linear"
         else:
             method = default
 
@@ -315,8 +315,8 @@ if __name__ == "__main__":
     # Test the connect function
     x = torch.randn(2, 3, 4)
     f = torch.randn_like(x)
-    y = connect(x, f, method="identity", dim=-1)
-    assert torch.allclose(y, x + f), "identity connection failed"
+    y = connect(x, f, method="linear", dim=-1)
+    assert torch.allclose(y, x + f), "linear connection failed"
 
     y = connect(x, f, method="orthogonal", dim=-1)
     assert torch.allclose(

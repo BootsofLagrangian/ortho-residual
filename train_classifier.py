@@ -191,8 +191,8 @@ def main(args):
     world_size = dist.get_world_size()
     seed = args.seed * dist.get_world_size() + rank
     print(f"Starting rank={rank}, world_size={dist.get_world_size()}. local seed={seed}. global batch size={args.global_batch_size}.")
-    res_conn = "orthogonal" if args.orthogonal_residual else "identity"
-    ortho_method = args.orthogonal_method if args.orthogonal_residual else "identity"
+    res_conn = "orthogonal" if args.orthogonal_residual else "linear"
+    ortho_method = args.orthogonal_method if args.orthogonal_residual else "linear"
     run_name = f"{args.model}-{args.preset}/{patch_size}_{res_conn}_{ortho_method}_{args.dataset}_seed{args.seed}"
 
     if rank == 0:
@@ -267,7 +267,7 @@ def main(args):
     # Build the model based on the chosen option
     if "resnet" in args.model:
         residual_kwargs = dict(
-            residual_connection="orthogonal" if args.orthogonal_residual else "identity",
+            residual_connection=res_conn,
             orthogonal_method=args.orthogonal_method,
             residual_eps=args.orthogonal_eps,
             residual_perturbation=args.orthogonal_perturbation,
@@ -294,7 +294,7 @@ def main(args):
             pos_embed="learn",
             block_class=OrthoBlock,
             drop_path=args.drop_path,
-            residual_connection="orthogonal" if args.orthogonal_residual else "identity",
+            residual_connection=res_conn,
             orthogonal_method=args.orthogonal_method,
             residual_eps=args.orthogonal_eps,
             residual_perturbation=args.orthogonal_perturbation,
