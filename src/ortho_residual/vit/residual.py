@@ -8,7 +8,7 @@ def _identity(x: torch.Tensor, f_x: torch.Tensor) -> torch.Tensor:
     """
     return f_x
 
-def _orthogonal_channel(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: float) -> torch.Tensor:
+def _orthogonal_channel(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: torch.Tensor) -> torch.Tensor:
     """
     orthogonal residual connection
     x   : residual stream
@@ -20,7 +20,7 @@ def _orthogonal_channel(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: float
     proj_out = scale * x
     return f_x - proj_out
 
-def _orthogonal_global(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: float) -> torch.Tensor:
+def _orthogonal_global(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: torch.Tensor) -> torch.Tensor:
     """
     orthogonal residual connection
     x   : residual stream

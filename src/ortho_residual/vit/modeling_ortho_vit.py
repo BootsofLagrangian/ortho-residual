@@ -39,14 +39,11 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import logging, auto_docstring
 from transformers.models.vit.modeling_vit import ViTEmbeddings, ViTPatchEmbeddings, ViTSelfAttention, ViTSelfOutput, ViTAttention, ViTIntermediate, ViTPooler # Use HF implementations for these
 
-# Assuming connect.py is in the same directory
-# from .connect import connect # For use as a package
-# For standalone script, you might need to adjust import path or ensure connect.py is findable
 logger = logging.get_logger(__name__)
 try:
     from .residual import connect
 except ImportError:
-    logger.warning("residual.py not found, using fallback linear connect function.")
+    logger.warning("[modelling_ortho_vit] residual.py not found, using fallback linear connect function.")
     def connect(x, f_x, *args, **kwargs): # Linear connection fallback
         """
         Fallback connection function if connect.py is not available.
