@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ortho_residual"
+version = "0.0.0"
+authors = [
+  { name="BootsofLagrangian", email="hard2251@yonsei.ac.kr" }, 
+]
+description = "Orthogonal residual connection for Llama and ViT architecture."
+readme = "README.md" 
+requires-python = ">=3.8" 
+classifiers = [ 
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License", # based on Hugging Face's license
+    "Development Status :: 3 - Alpha",
+    "Natural Language :: English",
+
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch",
+    "transformers>=4.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/BootsofLagrangian/ortho-residual"
+"Bug Tracker" = "https://github.com/BootsofLagrangian/ortho-residual/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
