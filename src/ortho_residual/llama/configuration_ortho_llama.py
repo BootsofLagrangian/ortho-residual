@@ -137,7 +137,7 @@ class OrthoLlamaConfig(LlamaConfig):
     >>> configuration = model.config
     ```"""
 
-    model_type = "llama"
+    model_type = "ortho_llama"
 
     def __init__(
         self,
