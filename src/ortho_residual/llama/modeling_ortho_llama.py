@@ -49,6 +49,12 @@ from transformers.models.llama.modeling_llama import (
     LlamaMLP,
     LlamaAttention,
 )
+"""OrthoLlama model for Huggingface. 
+From Revisiting Residual Connections: Orthogonal Residual Connections for Vision Transformers.
+preprint arXiv:2505.11881
+
+Authors: Giyeong Oh, Woohyun Cho, Siyeol Kim, Suhwan Choi, Younjae Yu
+"""
 
 logger = logging.get_logger(__name__)
 try:

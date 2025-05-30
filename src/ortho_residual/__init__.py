@@ -25,15 +25,16 @@ from .vit.modeling_ortho_vit import (
     OrthoViTModel,
 )
 
-from transformers import AutoModel, AutoModelForCausalLM, AutoModelForImageClassification
+from transformers import AutoConfig, AutoModel, AutoModelForCausalLM, AutoModelForImageClassification
 
+AutoConfig.register("ortho_llama", OrthoLlamaConfig)  # for mapping config to model
 OrthoLlamaConfig.register_for_auto_class()
 AutoModel.register(OrthoLlamaConfig, OrthoLlamaModel)
 OrthoLlamaModel.register_for_auto_class("AutoModel")
 AutoModelForCausalLM.register(OrthoLlamaConfig, OrthoLlamaForCausalLM) # for mapping config to model
 OrthoLlamaForCausalLM.register_for_auto_class("AutoModelForCausalLM")  # for saving modeling code
 
-
+AutoConfig.register("ortho_vit", OrthoViTConfig)  # for mapping config to model
 OrthoViTConfig.register_for_auto_class()
 AutoModel.register(OrthoViTConfig, OrthoViTModel)
 OrthoViTModel.register_for_auto_class("AutoModel")

@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""PyTorch OrthoViT model. 
+"""OrthoViT model for Huggingface. 
 From Revisiting Residual Connections: Orthogonal Residual Connections for Vision Transformers.
 preprint arXiv:2505.11881
 
