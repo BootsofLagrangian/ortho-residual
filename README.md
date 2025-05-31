@@ -4,7 +4,7 @@ This repository provides the official PyTorch implementation for the paper:
 [Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks
 ](https://arxiv.org/abs/2505.11881)
 
-🚀 Try our pretrained **OrthoViT-B** model directly via [Hugging Face](https://huggingface.co/BootsofLagrangian/ortho-vit-b-imagenet1k-hf).
+🚀 Try our pretrained on ImageNet-1k **OrthoViT-B** model directly via [Hugging Face](https://huggingface.co/BootsofLagrangian/ortho-vit-b-imagenet1k-hf).
 
 ## Abstract
 
