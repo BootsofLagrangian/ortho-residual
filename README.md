@@ -4,6 +4,8 @@ This repository provides the official PyTorch implementation for the paper:
 [Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks
 ](https://arxiv.org/abs/2505.11881)
 
+🚀 Try our pretrained **OrthoViT-B** model directly via [Hugging Face](https://huggingface.co/BootsofLagrangian/ortho-vit-b-imagenet1k-hf).
+
 ## Abstract
 
 Residual connections are pivotal for deep neural networks, enabling greater depth by mitigating vanishing gradients. However, in standard residual updates, the module's output is directly added to the input stream. This can lead to updates that predominantly reinforce or modulate the existing stream direction, potentially underutilizing the module's capacity for learning entirely novel features. In this work, we introduce _Orthogonal Residual Update_: we decompose the module's output relative to the input stream and add only the component orthogonal to this stream. This design aims to guide modules to contribute primarily new representational directions, fostering richer feature learning while promoting more efficient training. We demonstrate that our orthogonal update strategy improves generalization accuracy and training stability across diverse architectures (ResNetV2, Vision Transformers) and datasets (CIFARs, TinyImageNet, ImageNet-1k), achieving, for instance, a +4.3\%p top-1 accuracy gain for ViT-B on ImageNet-1k.
