@@ -123,6 +123,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     print("Tokenizer loaded successfully.")
 
+<<<<<<< HEAD
     # Set pad_token to eos_token if eos_token exists
     # if tokenizer.eos_token:
     #     # print(f"Setting pad_token to eos_token ('{tokenizer.eos_token}', id: {tokenizer.eos_token_id})")
@@ -131,12 +132,15 @@ try:
     # else:
     #     print("Warning: eos_token not found in tokenizer. pad_token not set.")
 
+=======
+>>>>>>> ed2ffd4 (fix typo)
     # Ensure bos_token is set
     if not tokenizer.bos_token:
         print("Warning: bos_token not found or set in tokenizer.")
     else:
         print(f"bos_token is set to '{tokenizer.bos_token}' (id: {tokenizer.bos_token_id})")
 
+<<<<<<< HEAD
     # Ensure the specific tokenizer save directory exists
     # os.makedirs(tokenizer_save_path, exist_ok=True)
 
@@ -144,6 +148,8 @@ try:
     # print(f"Saving tokenizer to '{tokenizer_save_path}'...")
     # tokenizer.save_pretrained(tokenizer_save_path)
     # print(f"Tokenizer saved successfully to '{tokenizer_save_path}'.")
+=======
+>>>>>>> ed2ffd4 (fix typo)
 
     # Get tokenizer info to update configs
     # tokenizer_pad_token_id = tokenizer.pad_token_id

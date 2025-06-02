@@ -4,6 +4,7 @@ __pycache__
 *.pyo
 tmp/
 temp/
+*egg-info*
 
 ## byproducts
 checkpoints/
@@ -15,6 +16,7 @@ results/
 results-classifier/
 samples/
 exp/
+preset/
 
 ## Ignore all archives
 *.tar.gz

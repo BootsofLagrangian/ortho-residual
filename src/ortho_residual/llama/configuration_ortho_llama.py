@@ -152,7 +152,7 @@ class OrthoLlamaConfig(LlamaConfig):
         super().__init__(**kwargs)
         self.residual_connection = residual_connection
         self.orthogonal_method = orthogonal_method
-        self.residual_dim = residual_connection_dim
+        self.residual_connection_dim = residual_connection_dim
         self.residual_perturbation = residual_perturbation
         self.residual_eps = residual_eps
         
@@ -167,7 +167,7 @@ class OrthoLlamaConfig(LlamaConfig):
         return dict(
             method=self.residual_connection,
             orthogonal_method=self.orthogonal_method,
-            dim=self.residual_dim,
+            dim=self.residual_connection_dim,
             perturbation=self.residual_perturbation,
         )
 

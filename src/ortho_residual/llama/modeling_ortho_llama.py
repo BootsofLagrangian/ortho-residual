@@ -58,7 +58,7 @@ Authors: Giyeong Oh, Woohyun Cho, Siyeol Kim, Suhwan Choi, Younjae Yu
 
 logger = logging.get_logger(__name__)
 try:
-    from ortho_residual.residual import connect
+    from .residual import connect
 except ImportError:
     logger.warning("[modelling_ortho_llama] residual.py not found, using fallback linear connect function.")
     def connect(x, f_x, *args, **kwargs): # Linear connection fallback
