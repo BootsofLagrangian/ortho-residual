@@ -1,8 +1,7 @@
 import torch
 from collections import OrderedDict
 from transformers import AutoConfig, AutoModel, AutoModelForImageClassification
-# Make sure these modules can be imported
-# Adjust paths if they are in a different directory structure
+
 from ortho_residual.vit.modeling_ortho_vit import OrthoViTForImageClassification, OrthoViTModel
 from ortho_residual.vit.configuration_ortho_vit import OrthoViTConfig
 

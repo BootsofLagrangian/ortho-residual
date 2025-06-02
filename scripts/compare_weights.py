@@ -4,10 +4,6 @@ from collections import OrderedDict
 from transformers import AutoModelForImageClassification
 import argparse
 
-# Assuming these custom modules are in the same directory or PYTHONPATH
-# If you've structured them as a package (e.g., 'ortho_vit_package.modeling_ortho_vit'),
-# adjust the import accordingly. For Hub's trust_remote_code, direct imports
-# (handled by HF) are common, but for this local script, they need to be findable.
 try:
     from ortho_residual.vit.modeling_ortho_vit import OrthoViTForImageClassification, OrthoViTModel
     from ortho_residual.vit.configuration_ortho_vit import OrthoViTConfig

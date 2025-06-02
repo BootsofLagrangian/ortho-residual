@@ -60,7 +60,7 @@ def evaluate_model(args):
     # Load ImageNet-1k validation dataset
     # Using standard 'imagenet-1k' dataset from Hugging Face datasets
     # Ensure you have access or it will download (can be large)
-    # The image key is 'image' and label key is 'label' for this dataset.
+    # The image key is 'jpg' and label key is 'cls' for this dataset.
     print("Loading ImageNet-1k validation dataset...")
     try:
         val_dataset = load_dataset(
