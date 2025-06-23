@@ -72,13 +72,13 @@ class OrthoViTConfig(ViTConfig):
         elementwise_affine_ln=False, # To match user's OrthoBlock norm1/norm2
         **kwargs,
     ):
-        super().__init__(**kwargs)
         self.residual_connection = residual_connection
         self.orthogonal_method = orthogonal_method
         self.residual_connection_dim = residual_connection_dim
         self.residual_eps = residual_eps
         self.residual_perturbation = residual_perturbation
         self.elementwise_affine_ln = elementwise_affine_ln # For ViTLayer norms
+        super().__init__(**kwargs)
 
     @property
     def residual_kwargs(self) -> dict:
