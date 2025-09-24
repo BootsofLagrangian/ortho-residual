@@ -66,9 +66,9 @@ Our method demonstrates consistent improvements across various models and datase
 If you find this work useful for your research, please consider citing our paper:
 
 ```
-@article{oh2025revisitingresidualconnectionsorthogonal,
+@article{oh2025revisiting,
       title={Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks}, 
-      author={Giyeong Oh and Woohyun Cho and Siyeol Kim and Suhwan Choi and Younjae Yu},
+      author={Giyeong Oh and Woohyun Cho and Siyeol Kim and Suhwan Choi and Youngjae Yu},
       year={2025},
       journal={arXiv preprint arXiv:2505.11881},
       eprint={2505.11881},
