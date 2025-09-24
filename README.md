@@ -1,5 +1,7 @@
 # Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks
 
+📢 Accepted at NeurIPS 2025 (Poster)
+
 This repository provides the official PyTorch implementation for the paper:
 [Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks
 ](https://arxiv.org/abs/2505.11881)
