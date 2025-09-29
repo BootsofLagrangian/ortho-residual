@@ -6,14 +6,14 @@ preset:           B                # ViT-Base (dim=768, depth=12, heads=12)
 
 # batch & epochs
 global_batch_size: 4096
-grad_accumulate_steps: 2
+grad_accumulate_steps: 4
 epochs:            300
 warmup_epoch:      10
 
 # optimiser / sched
 optimizer:         adam
-lr:                5.0e-4
-weight_decay:      0.0001
+lr:                1.0e-4
+weight_decay:      0.001
 adam_beta1:        0.9
 adam_beta2:        0.999
 lr_scheduler_type: cos
