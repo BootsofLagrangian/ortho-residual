@@ -112,24 +112,55 @@ def _orthogonal_global(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: torch.
     )
     return f_ortho, results
 
+def _negative(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: torch.Tensor) -> Tuple[torch.Tensor, RawConnStat]:
+    """
+    negative residual connection
+    x   : residual stream
+    f_x : attention/MLP/conv(if channel-wise) output
+    """
+    # eps = eps.to(x.device)
+    stream = x - f_x
+    dot = (x * f_x).sum(dim, keepdim=True)
+    x_norm2 = (x * x).sum(dim, keepdim=True).float()
+    x_norm2 = x_norm2.clamp_min(eps)  # numerical stability
+
+    f_par = (dot / x_norm2).to(dtype=x.dtype) * x  # [B,1]
+    f_ortho = f_x - f_par
+
+    results = RawConnStat(
+        dim=dim,
+        eps=eps,
+        x=x,
+        f_x=f_x,
+        stream=stream,
+        dot=dot,
+        x_norm2=x_norm2,
+        f_par=f_par,
+        f_ortho=f_ortho,
+    )
+    return stream, results
+
 def connect(x: torch.Tensor, f_x: torch.Tensor, *, 
             method="linear", orthogonal_method="global",
             dim=-1, eps=1e-6, perturbation=None) -> Tuple[torch.Tensor, RawConnStat]:
     if perturbation is not None:
         f_x = f_x + torch.randn_like(f_x) * perturbation
     if method == "linear":
-        stream = x + f_x
-        results = RawConnStat(
-            dim=dim,
-            eps=eps,
-            x=x,
-            f_x=f_x,
-            stream=stream,
-            dot=None,
-            x_norm2=None,
-            f_par=None,
-            f_ortho=None,
-        )
+        if orthogonal_method == "negative":
+            stream, results = _negative(x, f_x, dim, eps)
+        else:
+            stream = x + f_x
+            results = RawConnStat(
+                dim=dim,
+                eps=eps,
+                x=x,
+                f_x=f_x,
+                stream=stream,
+                dot=None,
+                x_norm2=None,
+                f_par=None,
+                f_ortho=None,
+            )
         return stream, results
     elif method == "orthogonal":
         if orthogonal_method == "global":
@@ -279,7 +310,8 @@ class ConnLoggerMixin:
     ):
         assert tag in TAG2ID, f"Unknown tag: {tag}"
         vec_dim = 1 if tag == "conv" else -1   # channel vs hidden
-        orthogonal_method = orthogonal_method if tag == "conv" else "channel"
+        if tag == "conv":
+            orthogonal_method = orthogonal_method if orthogonal_method == "negative" else "channel"
 
         if not torch.is_tensor(eps):
             eps = torch.tensor([1e-6], device=x.device, dtype=torch.float32)

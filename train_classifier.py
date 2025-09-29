@@ -193,7 +193,10 @@ def main(args):
     print(f"Starting rank={rank}, world_size={dist.get_world_size()}. local seed={seed}. global batch size={args.global_batch_size}.")
     res_conn = "orthogonal" if args.orthogonal_residual else "linear"
     ortho_method = args.orthogonal_method if args.orthogonal_residual else "linear"
+    if args.orthogonal_method == "negative":
+        ortho_method = "negative"
     run_name = f"{args.model}-{args.preset}/{patch_size}_{res_conn}_{ortho_method}_{args.dataset}_seed{args.seed}"
+    print(f"Run name: {run_name}")
 
     if rank == 0:
         os.makedirs(args.results_dir, exist_ok=True)  # Make results folder (holds all experiment subfolders)
@@ -645,7 +648,7 @@ if __name__ == "__main__":
                     help="Enable orthogonal residual connections if specified.")
     parser.add_argument("--orthogonal_prob", type=float, default=None,
                         help="Rate of orthogonal residual connections.")
-    parser.add_argument("--orthogonal_method", type=str, choices=["channel", "global"],
+    parser.add_argument("--orthogonal_method", type=str, choices=["negative", "channel", "global"],
                         default="global",
                         help="Method for orthogonal residual connections.")
     parser.add_argument("--orthogonal_pattern", type=str, default=None,
