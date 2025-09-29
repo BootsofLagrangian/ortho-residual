@@ -516,11 +516,11 @@ def main(args):
                     # Calculate samples per second (accounting for batch size and world size)
                     samples_per_sec = log_steps * local_batch_size * dist.get_world_size() / (end_time - start_time)
 
-                    # Calculate average loss across all processes
+                    # Calculate average loss across all processes (per optimizer step)
                     optimizer_loss = torch.tensor(running_loss / log_steps, device=device)
                     dist.all_reduce(optimizer_loss, op=dist.ReduceOp.SUM)
                     optimizer_loss = optimizer_loss.item() / dist.get_world_size()
-                    micro_batch_loss = (optimizer_loss / accum_steps)
+                    avg_train_loss = optimizer_loss / accum_steps
 
                     # Collect model stats if available
                     stats = None
@@ -538,8 +538,7 @@ def main(args):
 
                         logger.info(
                             f"(step={train_steps:07d}) " \
-                            f"Train Optimizer Loss: {optimizer_loss:.4f} " \
-                            f"Train Micro Batch Loss: {micro_batch_loss:.4f} " \
+                            f"Train Loss: {avg_train_loss:.4f} " \
                             f"Train Steps/Sec: {steps_per_sec:.2f} " \
                             f"Train Samples/Sec: {samples_per_sec:.1f}"
                         )
@@ -547,8 +546,7 @@ def main(args):
                         # Log training metrics to a separate table in wandb
                         wandb.log(
                             {
-                                "train/optimizer_loss": optimizer_loss,
-                                "train/micro_batch_loss": micro_batch_loss,
+                                "train/loss": avg_train_loss,
                                 "train/step": train_steps,
                                 "train/lr": lr_scheduler.get_last_lr()[0],
                                 "train/samples_per_sec": samples_per_sec,
