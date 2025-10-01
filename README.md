@@ -53,7 +53,7 @@ torchrun --nproc-per-node [N_GPU] train_classifier.py --config_file [path_to_con
 - Activating Orthogonal Residual Updates: To enable our Orthogonal Residual Update mechanism, add the following flag to the training command `--orthogonal_residual`.
 Without this flag, the models will use standard linear residual updates by default. 
 
-- You can also specify the type of orthogonalization (e.g., channel or global) via `--orthogonal_method channel`, `--orthogonal_method global`. `channel` is (feature-wise is default).
+- You can also specify the type of orthogonalization (e.g., feature or global) via `--orthogonal_method feature`, `--orthogonal_method global`. `feature` (feature-wise, also known as Orthogonal-F in the paper) is the default.
 
 - Predefined Recipes / Config Files:We provide several predefined configuration files (recipes) in the configs/ directory for reproducing the key results reported in our paper.
 

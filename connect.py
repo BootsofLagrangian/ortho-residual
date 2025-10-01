@@ -140,8 +140,8 @@ def _negative(x: torch.Tensor, f_x: torch.Tensor, dim: int, eps: torch.Tensor) -
     )
     return stream, results
 
-def connect(x: torch.Tensor, f_x: torch.Tensor, *, 
-            method="linear", orthogonal_method="global",
+def connect(x: torch.Tensor, f_x: torch.Tensor, *,
+            method="linear", orthogonal_method="feature",
             dim=-1, eps=1e-6, perturbation=None) -> Tuple[torch.Tensor, RawConnStat]:
     if perturbation is not None:
         f_x = f_x + torch.randn_like(f_x) * perturbation
@@ -165,7 +165,7 @@ def connect(x: torch.Tensor, f_x: torch.Tensor, *,
     elif method == "orthogonal":
         if orthogonal_method == "global":
             results_with_stat = _orthogonal_global(x, f_x, dim, eps)
-        elif orthogonal_method == "channel":
+        elif orthogonal_method == "feature":
             results_with_stat = _orthogonal_channel(x, f_x, dim, eps)
         else:
             raise ValueError(f"unknown orthogonal method: {method}")
@@ -298,20 +298,20 @@ class ConnLoggerMixin:
         self._get_step = fn
 
     def _connect_and_collect(
-        self, 
-        x: torch.Tensor, 
-        out: torch.Tensor, 
+        self,
+        x: torch.Tensor,
+        out: torch.Tensor,
         *,
         tag="conv",
         method="orthogonal",
-        orthogonal_method="global",
+        orthogonal_method="feature",
         eps=None,
         perturbation=None,
     ):
         assert tag in TAG2ID, f"Unknown tag: {tag}"
         vec_dim = 1 if tag == "conv" else -1   # channel vs hidden
         if tag == "conv":
-            orthogonal_method = orthogonal_method if orthogonal_method == "negative" else "channel"
+            orthogonal_method = orthogonal_method if orthogonal_method == "negative" else "feature"
 
         if not torch.is_tensor(eps):
             eps = torch.tensor([1e-6], device=x.device, dtype=torch.float32)

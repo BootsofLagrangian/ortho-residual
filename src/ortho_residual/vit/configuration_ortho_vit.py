@@ -35,9 +35,9 @@ class OrthoViTConfig(ViTConfig):
     Args:
         residual_connection (`str`, *optional*, defaults to `"linear"`):
             The type of residual connection to use. Can be "linear" or "orthogonal".
-        orthogonal_method (`str`, *optional*, defaults to `"channel"`):
+        orthogonal_method (`str`, *optional*, defaults to `"feature"`):
             The method for orthogonalization if `residual_connection` is "orthogonal".
-            Can be "channel" or "global". For ViT, "channel" is typically used for token embeddings.
+            Can be "feature" or "global". For ViT, "feature" is typically used for token embeddings.
         residual_connection_dim (`int`, *optional*, defaults to -1):
             The dimension along which to compute orthogonality. Defaults to -1 (last dimension).
         residual_eps (`float`, *optional*, defaults to 1e-6):
@@ -65,7 +65,7 @@ class OrthoViTConfig(ViTConfig):
     def __init__(
         self,
         residual_connection="linear",
-        orthogonal_method="channel", # For ViT, 'channel' typically means along the hidden_dim
+        orthogonal_method="feature", # For ViT, 'feature' typically means along the hidden_dim
         residual_connection_dim=-1,
         residual_eps=1e-6,
         residual_perturbation=None,

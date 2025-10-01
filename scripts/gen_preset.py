@@ -27,7 +27,7 @@ smollm_135_config_base = OrthoLlamaConfig(
     # residual_connection specific parameters will be set later
     torch_dtype=torch.bfloat16,
     # residual connection specific parameters
-    orthogonal_method="channel",
+    orthogonal_method="feature",
     residual_dim=-1,  # Default to last dimension
     residual_perturbation=None,
     residual_eps=1e-6,
@@ -54,7 +54,7 @@ smollm_360_config_base = OrthoLlamaConfig(
     # residual_connection specific parameters will be set later
     torch_dtype=torch.bfloat16,
     # residual connection specific parameters
-    orthogonal_method="channel",
+    orthogonal_method="feature",
     residual_dim=-1,  # Default to last dimension
     residual_perturbation=None,
     residual_eps=1e-6,
@@ -82,7 +82,7 @@ smollm_1b_config_base = OrthoLlamaConfig(
     # residual_connection specific parameters will be set later
     torch_dtype=torch.bfloat16,
     # residual connection specific parameters
-    orthogonal_method="channel",
+    orthogonal_method="feature",
     residual_dim=-1,  # Default to last dimension
     residual_perturbation=None,
     residual_eps=1e-6,
@@ -144,7 +144,7 @@ except Exception as e:
 
 # Define residual connection types and their corresponding postfixes/settings
 residual_options = [
-    ('orthogonal', 'ortho', {"residual_connection": "orthogonal", "orthogonal_method": "channel", "residual_eps": 1e-6, "residual_perturbation": None}),
+    ('orthogonal', 'ortho', {"residual_connection": "orthogonal", "orthogonal_method": "feature", "residual_eps": 1e-6, "residual_perturbation": None}),
     ('linear', 'base', {"residual_connection": "linear"}) # 'identity' might not need extra params, or use defaults
 ]
 

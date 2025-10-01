@@ -201,7 +201,7 @@ if __name__ == "__main__":
         "qkv_bias": True,
         "encoder_stride": 16, # This is typically the stride of the patch embeddings
         "residual_connection"   : "orthogonal", # or "linear"
-        "orthogonal_method": "channel",    # or "global"
+        "orthogonal_method": "feature",    # or "global"
         "residual_connection_dim": -1, # Default for ViT, means last dimension
         "residual_eps": 1e-6,
         "residual_perturbation": None, # or the float value used

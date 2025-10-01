@@ -51,7 +51,7 @@ def connect(x, f_x, *,
     elif method == "orthogonal":
         if orthogonal_method == "global":
             return x + _orthogonal_global(x, f_x, dim, eps)
-        elif orthogonal_method == "channel":
+        elif orthogonal_method == "feature":
             return x + _orthogonal_channel(x, f_x, dim, eps)
         else:
             raise ValueError(f"unknown orthogonal  method: {method}")

@@ -143,7 +143,7 @@ class OrthoLlamaConfig(LlamaConfig):
         self,
         *,
         residual_connection="linear",
-        orthogonal_method="channel",
+        orthogonal_method="feature",
         residual_connection_dim=-1,
         residual_eps=1e-6,
         residual_perturbation=None,
@@ -158,7 +158,7 @@ class OrthoLlamaConfig(LlamaConfig):
         super().__init__(**kwargs)
         
         # assert self.residual_kwargs["method"] in ("linear", "orthogonal"), "residual_connection must be either 'linear' or 'orthogonal'"
-        # assert self.residual_kwargs["orthogonal_method"] in ("global", "channel"), "orthogonal_method must be either 'global' or 'local'"
+        # assert self.residual_kwargs["orthogonal_method"] in ("global", "feature"), "orthogonal_method must be either 'global' or 'feature'"
         # for helper_key in ("residual_connection", "orthogonal_method", "residual_perturbation"):
         #     if helper_key in self.__dict__:
         #         delattr(self, helper_key)

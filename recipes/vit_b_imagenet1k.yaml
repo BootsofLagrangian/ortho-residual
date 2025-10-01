@@ -4,9 +4,11 @@ dataset:          imagenet1k
 preset:           B                # ViT-Base (dim=768, depth=12, heads=12)
 # orthogonal_residual: true # set this to true if you want to use orthogonal residuals
 
+orthogonal_method: feature
+
 # batch & epochs
 global_batch_size: 4096
-grad_accumulate_steps: 4
+grad_accumulate_steps: 2
 epochs:            300
 warmup_epoch:      10
 

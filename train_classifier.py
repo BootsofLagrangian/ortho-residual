@@ -646,8 +646,8 @@ if __name__ == "__main__":
                     help="Enable orthogonal residual connections if specified.")
     parser.add_argument("--orthogonal_prob", type=float, default=None,
                         help="Rate of orthogonal residual connections.")
-    parser.add_argument("--orthogonal_method", type=str, choices=["negative", "channel", "global"],
-                        default="global",
+    parser.add_argument("--orthogonal_method", type=str, choices=["negative", "feature", "global"],
+                        default="feature",
                         help="Method for orthogonal residual connections.")
     parser.add_argument("--orthogonal_pattern", type=str, default=None,
                         help="Pattern for orthogonal residual connections.")
