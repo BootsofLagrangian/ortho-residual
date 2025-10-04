@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 import wandb
 
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 
 from timm.data import Mixup
 from timm.loss import SoftTargetCrossEntropy
@@ -60,7 +60,6 @@ def load_state_dict_ckpt(model, sd):
         model = model.module
     model = getattr(model, "_orig_mod", model)
     model.load_state_dict(sd)
-
 def log_global_grad_norm(model, step, max_log_steps=50):
     tot, tot_sq = 0.0, 0.0
     for p in model.parameters():
@@ -356,25 +355,41 @@ def main(args):
 
     steps_per_epoch = min(len(train_loader) // args.grad_accumulate_steps,  args.max_train_steps)
     warmup_iters    = steps_per_epoch * args.warmup_epoch
+    min_lr_factor: Optional[float] = None
+    if args.min_lr is not None:
+        if args.lr <= 0:
+            raise ValueError("min_lr requires positive base learning rate")
+        if args.min_lr < 0:
+            raise ValueError("min_lr must be non-negative")
+        ratio = args.min_lr / args.lr
+        min_lr_factor = min(ratio, 1.0)
+
+    def apply_min_lr(scale: float) -> float:
+        if min_lr_factor is None:
+            return scale
+        return min_lr_factor + (1.0 - min_lr_factor) * scale
 
     if args.lr_scheduler_type == "cos":
         # cosine decay after warm‑up
         def lr_lambda(step):
-            if step < warmup_iters:
+            if warmup_iters > 0 and step < warmup_iters:
                 return step / warmup_iters
             pct = (step - warmup_iters) / max(1, args.epochs*steps_per_epoch - warmup_iters)
-            return 0.5 * (1 + math.cos(math.pi * pct))
+            scale = 0.5 * (1 + math.cos(math.pi * pct))
+            scale = max(0.0, scale)
+            return apply_min_lr(scale)
     elif args.lr_scheduler_type == "lin":  # linear decay
         def lr_lambda(step):
-            if step < warmup_iters:
+            if warmup_iters > 0 and step < warmup_iters:
                 return step / warmup_iters
             pct = (step - warmup_iters) / max(1, args.epochs*steps_per_epoch - warmup_iters)
-            return 1.0 - pct
+            scale = max(0.0, 1.0 - pct)
+            return apply_min_lr(scale)
     elif args.lr_scheduler_type == "const":
         def lr_lambda(step):
-            if step < warmup_iters:
+            if warmup_iters > 0 and step < warmup_iters:
                 return step / warmup_iters
-            return 1.0
+            return apply_min_lr(1.0)
     elif args.lr_scheduler_type == "step":
         # Parse decay epochs and convert to steps
         assert args.lr_scheduler_decay_epoch is not None, "lr_scheduler_decay_epoch must be specified for step scheduler."
@@ -383,7 +398,7 @@ def main(args):
 
         def lr_lambda(step):
             # Warmup phase
-            if step < warmup_iters:
+            if warmup_iters > 0 and step < warmup_iters:
                 if args.warmup_type == "linear":
                     return float(step) / float(max(1, warmup_iters))
                 elif args.warmup_type == "const":  
@@ -399,7 +414,8 @@ def main(args):
                 else:
                     # Since decay_steps is sorted, we can break early
                     break
-            return factor
+            factor = max(0.0, factor)
+            return apply_min_lr(factor)
     else:
         raise ValueError(f"Unknown learning rate scheduler type: {args.lr_scheduler_type}")
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
@@ -703,6 +719,8 @@ if __name__ == "__main__":
     parser.add_argument("--adam_beta2", type=float, default=0.999)
     
     parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--min_lr", type=float, default=None,
+                        help="Minimum learning rate value to reach at the end of scheduling.")
     parser.add_argument("--lr_scheduler_type", type=str, default="cos",
                         choices=["cos", "lin", "const", "step"],
                         help="Learning rate scheduler type.")
