@@ -106,7 +106,7 @@ def extract_features(model, dataloader, device):
     
     with torch.no_grad():
         for images, labels in tqdm(dataloader, desc="Extracting features"):
-            images = images.to(device)
+            images = images.to(device, non_blocking=True)
             
             # Forward pass - this will return features before the classifier
             features = model(images)

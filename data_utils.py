@@ -1,6 +1,29 @@
 import torch
 from datasets import load_dataset
+from torch.utils.data import Dataset
 from torchvision import transforms
+from typing import Any
+
+
+class _TransformedDataset(Dataset):
+    """Lightweight view over a dataset that applies transforms in __getitem__."""
+
+    def __init__(self, base: Any, image_key: str, label_key: str, transform):
+        self._base = base
+        self._image_key = image_key
+        self._label_key = label_key
+        self._transform = transform
+
+    def __len__(self):
+        return len(self._base)
+
+    def __getitem__(self, idx):
+        sample = self._base[idx]
+        image = sample[self._image_key]
+        if self._transform is not None:
+            image = self._transform(image)
+        label = sample[self._label_key]
+        return image, label
 
 
 def get_dataset(args):
@@ -235,15 +258,23 @@ def get_dataset(args):
     else:
         raise ValueError(f"Unknown dataset: {name}")
 
+    dataset = {
+        split: _TransformedDataset(
+            split_dataset,
+            image_key=image_key,
+            label_key=label_key,
+            transform=transform_train if split == "train" else transform_eval,
+        )
+        for split, split_dataset in dataset.items()
+    }
+
     def collate_train(batch):
-        images = torch.stack([transform_train(x[image_key]) for x in batch])
-        labels = torch.tensor([x[label_key] for x in batch])
-        return images, labels
+        images, labels = zip(*batch)
+        return torch.stack(images, dim=0), torch.as_tensor(labels)
 
     def collate_eval(batch):
-        images = torch.stack([transform_eval(x[image_key]) for x in batch])
-        labels = torch.tensor([x[label_key] for x in batch])
-        return images, labels
+        images, labels = zip(*batch)
+        return torch.stack(images, dim=0), torch.as_tensor(labels)
 
     return dataset, collate_train, collate_eval, in_chans, num_classes
 
