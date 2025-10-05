@@ -1,7 +1,20 @@
 project: debug
 dataset: cifar10
 
-# orthogonal_residual: true # set this to true if you want to use orthogonal residuals
+# === Residual / Orthogonal settings ===
+# Set this true to actually use orthogonal residual connections instead of plain sum.
+# When false (default), residual_connection="linear" and you still CAN log activations if log_activations: true.
+orthogonal_residual: true
+# Method for orthogonal residual decomposition: one of [feature, global, negative].
+#  - feature: project per feature dim (default)
+#  - global: use a global projection basis
+#  - negative: negative branch variant
+orthogonal_method: feature
+# Optional: choose only certain blocks to apply orthogonal residuals
+# Example pattern list indices (0-based). Uncomment to restrict.
+# orthogonal_pattern: "0,2,4"
+# Optional probabilistic gating each optimizer step (0~1). Uncomment to randomize.
+# orthogonal_prob: 0.5
 # model
 model: vit
 preset: S            # 384-dim, 6 layers, 6 heads
@@ -35,4 +48,15 @@ log_interval: 5
 
 use_amp: true
 torch_compile: true
+###############################################################################
+# Activation metric logging controls
+# log_activations: true  -> collect & log activation stats every log_interval steps.
+# force_activation_stats: true -> (debug) force collect EVERY forward (expensive) regardless of log_interval.
+#   Equivalent to setting environment variable ORTHO_FORCE_STATS=1
+#   Use only for short debug runs; disable for full training.
+###############################################################################
 log_activations: true
+force_activation_stats: true   # remove or set false for normal interval-based collection
+
+# If you want sparser logging just raise log_interval, e.g. 50 or 100.
+# log_interval: 50
