@@ -112,7 +112,8 @@ def evaluate_and_log(
 
     with torch.no_grad():
         for x, y in loader:
-            x, y = x.to(device), y.to(device)
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
             logits = model(x)
 
             # sum batch loss so we can average accurately later
@@ -261,9 +262,21 @@ def main(args):
         drop_last=True,
         sampler=train_sampler, collate_fn=collate_train
     )
+
+    eval_num_workers = min(8, (os.cpu_count() or 8))
+    eval_loader_kwargs = dict(
+        batch_size=local_batch_size,
+        sampler=test_sampler,
+        collate_fn=collate_eval,
+        num_workers=eval_num_workers,
+        pin_memory=True,
+        drop_last=False,
+    )
+    if eval_num_workers > 0:
+        eval_loader_kwargs.update(prefetch_factor=4, persistent_workers=True)
     test_loader  = DataLoader(
-        test_dataset, batch_size=local_batch_size,
-        sampler=test_sampler, collate_fn=collate_eval
+        test_dataset,
+        **eval_loader_kwargs,
     )
 
     # Build the model based on the chosen option
@@ -449,8 +462,8 @@ def main(args):
             if args.orthogonal_prob is not None:
                 set_connect(model.module, prob=args.orthogonal_prob, logger=None)
 
-            x = x.to(device)
-            y = y.to(device)
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
             x, y = mixup_fn(x, y)
 
             # Forward pass with proper AMP handling
