@@ -27,7 +27,6 @@ EPOCHS=1
 GLOBAL_BATCH=256
 NPROC=1
 LOG_INTERVAL=2
-ACT_LOG_INTERVAL=1
 FORCE_STATS=0
 CONFIG_FILE=""
 MULTI=0
@@ -62,7 +61,6 @@ while [[ $# -gt 0 ]]; do
     --global-batch) GLOBAL_BATCH="$2"; shift 2;;
     --nproc) NPROC="$2"; shift 2;;
     --log-interval) LOG_INTERVAL="$2"; shift 2;;
-    --act-log-interval) ACT_LOG_INTERVAL="$2"; shift 2;;
     --force) FORCE_STATS=1; shift;;
     --config) CONFIG_FILE="$2"; shift 2;;
     --multi) MULTI=1; shift;;
@@ -128,7 +126,7 @@ if [[ $SMOKE -eq 1 || $MULTI -eq 0 ]]; then
   cmd $RUN_TORCHRUN --nproc-per-node=1 train_classifier.py \
     --dataset "$DATASET" --model "$MODEL" --preset "$PRESET" \
     --epochs $EPOCHS --global_batch_size $GLOBAL_BATCH \
-    --log_interval $LOG_INTERVAL --activation_log_interval $ACT_LOG_INTERVAL \
+  --log_interval $LOG_INTERVAL \
     --log_activations $FORCE_FLAG --debug "${EXTRA_ARGS[@]}"
 fi
 
@@ -163,7 +161,7 @@ if [[ $MULTI -eq 1 ]]; then
     cmd $RUN_TORCHRUN --nproc-per-node=$NPROC train_classifier.py \
       --dataset "$DATASET" --model "$MODEL" --preset "$PRESET" \
       --epochs $EPOCHS --global_batch_size $GLOBAL_BATCH \
-      --log_interval $LOG_INTERVAL --activation_log_interval $ACT_LOG_INTERVAL \
+  --log_interval $LOG_INTERVAL \
       --log_activations $FORCE_FLAG --debug "${EXTRA_ARGS[@]}"
   fi
   NEW_EXP=$(ls -td ${RESULTS_DIR}/* 2>/dev/null | head -1 || true)

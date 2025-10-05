@@ -296,7 +296,8 @@ def main(args):
             orthogonal_method=args.orthogonal_method,
             residual_eps=args.orthogonal_eps,
             residual_perturbation=args.orthogonal_perturbation,
-            log_interval=(args.activation_log_interval or args.log_interval),
+            # Activation & training logs share the same interval now
+            log_interval=args.log_interval,
             log_activations=(rank == 0 and args.log_activations),
             num_classes=num_classes,
             is_layernorm_classifier=args.is_layernorm_classifier,
@@ -325,7 +326,8 @@ def main(args):
             residual_perturbation=args.orthogonal_perturbation,
             modulate=False,
             mlp_dropout=args.mlp_dropout,
-            log_interval=(args.activation_log_interval or args.log_interval),
+            # Activation & training logs share the same interval now
+            log_interval=args.log_interval,
             log_activations=(rank == 0 and args.log_activations),
             gradient_checkpointing=args.gradient_checkpointing,
         )
@@ -806,9 +808,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_activations", action="store_true",
                         help="Enable logging of activation statistics.")
     parser.add_argument("--log_interval", type=int, default=50,
-                        help="Interval (optimizer steps) for logging training progress (loss/acc).")
-    parser.add_argument("--activation_log_interval", type=int, default=None,
-                        help="Optional: interval (forward calls) for collecting activation stats inside blocks; defaults to log_interval if not set.")
+                        help="Interval (optimizer steps) for logging training progress AND collecting activation stats.")
     parser.add_argument("--force_activation_stats", action="store_true",
                         help="Force collect activation stats every forward pass (sets ORTHO_FORCE_STATS=1).")
     parser.add_argument("--save_every_steps", type=int, default=5000,
