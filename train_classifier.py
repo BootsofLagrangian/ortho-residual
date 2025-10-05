@@ -334,11 +334,7 @@ def main(args):
     else:
         raise ValueError(f"Unknown model type: {args.model}")
 
-    # Optionally force activation stats each forward for debugging
-    if getattr(args, 'force_activation_stats', False):
-        os.environ['ORTHO_FORCE_STATS'] = '1'
-        if rank == 0:
-            logger.info('[debug] ORTHO_FORCE_STATS=1 (force activation stats every forward)')
+    # (Removed force_activation_stats) We now always collect only on optimizer-step log_interval boundaries.
 
     if args.orthogonal_pattern is not None:
         pattern = args.orthogonal_pattern.split(",")
@@ -809,8 +805,7 @@ if __name__ == "__main__":
                         help="Enable logging of activation statistics.")
     parser.add_argument("--log_interval", type=int, default=50,
                         help="Interval (optimizer steps) for logging training progress AND collecting activation stats.")
-    parser.add_argument("--force_activation_stats", action="store_true",
-                        help="Force collect activation stats every forward pass (sets ORTHO_FORCE_STATS=1).")
+    # Removed: --force_activation_stats (was forcing per-forward collection). Simplified to interval-based only.
     parser.add_argument("--save_every_steps", type=int, default=5000,
                         help="Interval for saving checkpoints.")
     parser.add_argument("--save_every_epochs", type=int, default=10,

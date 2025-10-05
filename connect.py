@@ -355,11 +355,9 @@ class ConnLoggerMixin:
         
         # 수정: log_interval 주기로만 수집 (환경변수로 강제 가능)
         self._call_counter += 1
+        # Collect only every log_interval-th call (simplified; env override removed)
         should_log = (
-            self.log_activations and (
-                (self._call_counter % max(1, self.log_interval) == 0)
-                or os.environ.get("ORTHO_FORCE_STATS") == "1"
-            )
+            self.log_activations and (self._call_counter % max(1, self.log_interval) == 0)
         )
         if should_log:
             self._store_stats(tag, self.block_id, results)
