@@ -17,6 +17,7 @@ results-classifier/
 samples/
 exp/
 preset/
+features/
 
 ## Ignore all archives
 *.tar.gz

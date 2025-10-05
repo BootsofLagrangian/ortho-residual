@@ -296,7 +296,7 @@ def main(args):
             orthogonal_method=args.orthogonal_method,
             residual_eps=args.orthogonal_eps,
             residual_perturbation=args.orthogonal_perturbation,
-            log_interval=args.log_interval,
+            log_interval=(args.activation_log_interval or args.log_interval),
             log_activations=(rank == 0 and args.log_activations),
             num_classes=num_classes,
             is_layernorm_classifier=args.is_layernorm_classifier,
@@ -325,12 +325,18 @@ def main(args):
             residual_perturbation=args.orthogonal_perturbation,
             modulate=False,
             mlp_dropout=args.mlp_dropout,
-            log_interval=args.log_interval,
+            log_interval=(args.activation_log_interval or args.log_interval),
             log_activations=(rank == 0 and args.log_activations),
             gradient_checkpointing=args.gradient_checkpointing,
         )
     else:
         raise ValueError(f"Unknown model type: {args.model}")
+
+    # Optionally force activation stats each forward for debugging
+    if getattr(args, 'force_activation_stats', False):
+        os.environ['ORTHO_FORCE_STATS'] = '1'
+        if rank == 0:
+            logger.info('[debug] ORTHO_FORCE_STATS=1 (force activation stats every forward)')
 
     if args.orthogonal_pattern is not None:
         pattern = args.orthogonal_pattern.split(",")
@@ -558,11 +564,12 @@ def main(args):
                 )
 
                 stats: List[ConnStat] = []
-                if hasattr(model.module, "pop_stats"):
+                base_module = unwrap_model(model)
+                if hasattr(base_module, "pop_stats"):
                     if should_scalarize_stats:
-                        stats = model.module.pop_stats(scalarize=True)
+                        stats = base_module.pop_stats(scalarize=True)
                     else:
-                        model.module.pop_stats(scalarize=False)
+                        base_module.pop_stats(scalarize=False)
 
                 # Logging at regular intervals
                 if train_steps % args.log_interval == 0:
@@ -608,6 +615,11 @@ def main(args):
                                 if values:
                                     key = f"{module_name}/mean/{metric_name}"
                                     aggregated_log[key] = sum(values) / len(values)
+                        if buf_log:
+                            logger.debug(
+                                "Activation metrics collected: %d (sample keys: %s)",
+                                len(buf_log), list(buf_log.keys())[:5]
+                            )
 
                         acc_log = f" Train Acc@1: {train_acc_value:.4f}" if train_acc_value is not None else ""
                         logger.info(
@@ -794,7 +806,11 @@ if __name__ == "__main__":
     parser.add_argument("--log_activations", action="store_true",
                         help="Enable logging of activation statistics.")
     parser.add_argument("--log_interval", type=int, default=50,
-                        help="Interval for logging training progress.")
+                        help="Interval (optimizer steps) for logging training progress (loss/acc).")
+    parser.add_argument("--activation_log_interval", type=int, default=None,
+                        help="Optional: interval (forward calls) for collecting activation stats inside blocks; defaults to log_interval if not set.")
+    parser.add_argument("--force_activation_stats", action="store_true",
+                        help="Force collect activation stats every forward pass (sets ORTHO_FORCE_STATS=1).")
     parser.add_argument("--save_every_steps", type=int, default=5000,
                         help="Interval for saving checkpoints.")
     parser.add_argument("--save_every_epochs", type=int, default=10,

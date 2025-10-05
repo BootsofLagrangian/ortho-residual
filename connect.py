@@ -1,12 +1,25 @@
 import logging
 import random
 from typing import Optional, Sequence
+import os
 
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Any
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+
+try:
+    from torch import _dynamo as _torch_dynamo
+except ImportError:
+    _torch_dynamo = None
+
+
+def _disable_dynamo(fn):
+    if _torch_dynamo is None:
+        return fn
+    return _torch_dynamo.disable(fn)
+
 
 _METRICS = (
     "x_norm2", "f_par_norm2", "f_ortho_norm2",
@@ -297,11 +310,18 @@ class ConnLoggerMixin:
         self.log_activations = log_activations
         self.block_id = ConnLoggerMixin._global_block_id
         ConnLoggerMixin._global_block_id += 1
-        self._step_stats: List[Tuple[str, int, Dict[str, torch.Tensor]]] = []
+        self._step_stats: List[ConnStat] = []  # 변경: 텐서 dict 대신 ConnStat 바로 저장
+        self._call_counter = 0  # 추가: 내부 호출 카운터
 
     # to read the step (kept for backward compatibility, currently unused)
     def set_step_fn(self, fn):
         self._get_step = fn
+
+    def enable_activation_logging(self):
+        self.log_activations = True
+
+    def disable_activation_logging(self):
+        self.log_activations = False
 
     def _connect_and_collect(
         self,
@@ -331,27 +351,43 @@ class ConnLoggerMixin:
             method=method, orthogonal_method=orthogonal_method,
             perturbation=perturbation, eps=eps
         )
-        stream = stream.to(x.dtype) # for AMP
+        stream = stream.to(x.dtype)
         
-        if self.log_activations and isinstance(results, RawConnStat):
-            with torch.no_grad():
-                values = _stats(results)
-                self._step_stats.append((tag, self.block_id, values))
+        # 수정: log_interval 주기로만 수집 (환경변수로 강제 가능)
+        self._call_counter += 1
+        should_log = (
+            self.log_activations and (
+                (self._call_counter % max(1, self.log_interval) == 0)
+                or os.environ.get("ORTHO_FORCE_STATS") == "1"
+            )
+        )
+        if should_log:
+            self._store_stats(tag, self.block_id, results)
         return stream
+
+    @_disable_dynamo
+    def _store_stats(self, tag: str, block_id: int, results: RawConnStat):
+        if not isinstance(results, RawConnStat):
+            return
+        with torch.no_grad():
+            metrics = _stats(results)  # dict[str, tensor]
+            # 즉시 스칼라화 → compile 그래프에 텐서 참조 남기지 않음
+            scalar_metrics = {k: v.item() for k, v in metrics.items()}
+            self._step_stats.append(
+                ConnStat(
+                    module_name=tag,
+                    block_id=block_id,
+                    **scalar_metrics
+                )
+            )
 
     def pop_stats(self, *, scalarize: bool = True) -> list:
         cached = list(self._step_stats)
         self._step_stats.clear()
-
         if not scalarize:
             return []
-
-        stats: List[ConnStat] = []
-        for tag, block_id, metrics in cached:
-            scalar_metrics = {k: v.item() for k, v in metrics.items()}
-            stats.append(ConnStat(module_name=tag, block_id=block_id, **scalar_metrics))
-
-        return stats
+        # 이미 ConnStat 형태
+        return cached
 
 
 if __name__ == "__main__":

@@ -1,0 +1,38 @@
+project: debug
+dataset: cifar10
+
+# orthogonal_residual: true # set this to true if you want to use orthogonal residuals
+# model
+model: vit
+preset: S            # 384-dim, 6 layers, 6 heads
+drop_path: 0.0
+mlp_dropout: 0.0
+
+# optimization
+optimizer: adam
+global_batch_size: 1024
+grad_accumulate_steps: 1
+lr: 1.0e-3
+weight_decay: 0.0001
+epochs: 2
+warmup_epoch: 1
+lr_scheduler_type: cos
+grad_clip:
+
+# regularisation & aug
+use_mixup: true
+mixup_alpha: 0.8
+cutmix_alpha: 1.0
+mixup_prob: 1.0
+label_smoothing: 0.1
+random_erase: 0.25
+randaugment_N: 9
+randaugment_M: 5
+
+save_every_steps: 50000
+save_every_epochs: 300
+log_interval: 5
+
+use_amp: true
+torch_compile: true
+log_activations: true
