@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 import wandb
 
+from collections import defaultdict
 from typing import Tuple, List, Dict, Optional
 
 from timm.data import Mixup
@@ -25,7 +26,7 @@ from timm.loss import SoftTargetCrossEntropy
 from preactresnet import PRESET_PREACT_RESNET
 from base import Classifier, PRESET_VIT
 from ortho_models import OrthoBlock
-from connect import _METRICS, ConnLoggerMixin, set_connect
+from connect import _METRICS, ConnStat, set_connect
 from data_utils import get_dataset
 
 def create_logger(logging_dir, debug: bool = False):
@@ -47,21 +48,25 @@ def create_logger(logging_dir, debug: bool = False):
     return logger
 
 
-def get_state_dict_for_save(m):
-    # 1. unwrap DDP
+def unwrap_model(m: torch.nn.Module) -> torch.nn.Module:
+    """Return the underlying PyTorch module, unwrapping DDP and torch.compile."""
     if isinstance(m, torch.nn.parallel.DistributedDataParallel):
         m = m.module
-    # 2. unwrap torch.compile
-    m = getattr(m, "_orig_mod", m)
+    return getattr(m, "_orig_mod", m)
+
+
+def get_state_dict_for_save(m):
+    m = unwrap_model(m)
     return m.state_dict()
 
 def load_state_dict_ckpt(model, sd):
-    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-        model = model.module
-    model = getattr(model, "_orig_mod", model)
+    model = unwrap_model(model)
     model.load_state_dict(sd)
+
+
 def log_global_grad_norm(model, step, max_log_steps=50):
-    tot, tot_sq = 0.0, 0.0
+    tot_sq = 0.0
+    model = unwrap_model(model)
     for p in model.parameters():
         if p.grad is None: continue
         g2 = p.grad.detach().pow(2).sum()
@@ -80,7 +85,8 @@ def accuracy_counts(
     Given model outputs and targets, return a list of correct‐counts
     for each k in topk.
     """
-    maxk = max(topk)
+    num_classes = logits.size(1)
+    maxk = min(max(topk), num_classes)
 
     # (batch_size, maxk)
     _, pred = logits.topk(maxk, dim=1, largest=True, sorted=True)
@@ -90,7 +96,11 @@ def accuracy_counts(
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
     # return list of sums over first k rows
-    return [correct[:k].reshape(-1).sum().item() for k in topk]
+    counts: List[int] = []
+    for k in topk:
+        kk = min(k, num_classes)
+        counts.append(correct[:kk].reshape(-1).sum().item())
+    return counts
 
 
 def evaluate_and_log(
@@ -348,10 +358,6 @@ def main(args):
     model = DDP(base_model, device_ids=[local_rank])
     if rank == 0:
         logger.info(model.module)
-    for module in model.module.modules():
-        if isinstance(module, ConnLoggerMixin):
-            module.set_step_fn(lambda: train_steps)
-
     if args.optimizer == "adam":
         betas = (args.adam_beta1, args.adam_beta2)
         optimizer = torch.optim.Adam(
@@ -450,20 +456,24 @@ def main(args):
         train_sampler.set_epoch(epoch)
         model.train()
         running_loss, log_steps = 0.0, 0
+        running_correct, running_examples = 0.0, 0
         current_accum = 0  # Track accumulated steps within the current group
         start_time = time.time()
         optimizer.zero_grad(set_to_none=True)
-        
+
         for i, (x, y) in enumerate(train_loader):
             if train_steps > args.max_train_steps:
                 break
-            
+
             # Control orthogonal connections if needed
             if args.orthogonal_prob is not None:
                 set_connect(model.module, prob=args.orthogonal_prob, logger=None)
 
+            is_last_batch = (i == len(train_loader) - 1)
+
             x = x.to(device, non_blocking=True)
             y = y.to(device, non_blocking=True)
+            targets = y
             x, y = mixup_fn(x, y)
 
             # Forward pass with proper AMP handling
@@ -484,9 +494,12 @@ def main(args):
             # Update tracking variables
             current_accum += 1
             running_loss += loss.item() * accum_steps
+
+            if not args.use_mixup:
+                running_correct += accuracy_counts(logits, targets, topk=(1,))[0]
+                running_examples += targets.size(0)
             
             # Handle gradient accumulation - process when we've accumulated enough steps or at the last batch
-            is_last_batch = (i == len(train_loader) - 1)
             perform_step = (current_accum == accum_steps) or is_last_batch
             
             if perform_step:
@@ -537,6 +550,20 @@ def main(args):
                 # Reset accumulation counter
                 current_accum = 0
                 
+                should_scalarize_stats = (
+                    rank == 0
+                    and args.log_activations
+                    and args.log_interval > 0
+                    and (train_steps % args.log_interval == 0)
+                )
+
+                stats: List[ConnStat] = []
+                if hasattr(model.module, "pop_stats"):
+                    if should_scalarize_stats:
+                        stats = model.module.pop_stats(scalarize=True)
+                    else:
+                        model.module.pop_stats(scalarize=False)
+
                 # Logging at regular intervals
                 if train_steps % args.log_interval == 0:
                     torch.cuda.synchronize()
@@ -551,25 +578,44 @@ def main(args):
                     optimizer_loss = optimizer_loss.item() / dist.get_world_size()
                     avg_train_loss = optimizer_loss / accum_steps
 
+                    train_acc_value: Optional[float] = None
+                    if not args.use_mixup and running_examples > 0:
+                        correct_tensor = torch.tensor(running_correct, device=device, dtype=torch.float64)
+                        total_tensor = torch.tensor(running_examples, device=device, dtype=torch.float64)
+                        dist.all_reduce(correct_tensor, op=dist.ReduceOp.SUM)
+                        dist.all_reduce(total_tensor, op=dist.ReduceOp.SUM)
+                        if total_tensor.item() > 0:
+                            train_acc_value = (correct_tensor / total_tensor).item()
+
                     # Collect model stats if available
-                    stats = None
                     buf_log = {}
 
                     if rank == 0:
-                        if hasattr(model.module, "pop_stats"):
-                            stats = model.module.pop_stats()
+                        aggregated_metrics: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+                        if stats:
                             logger.debug(f"stats={stats}")
                             for stat in stats:
                                 module_name = stat.module_name
                                 block_id = stat.block_id
-                                for k in _METRICS:
-                                    buf_log[f"{module_name}/block{block_id:02d}/{k}"] = getattr(stat, k)
+                                for k, value in stat.metrics().items():
+                                    buf_log[f"{module_name}/block{block_id:02d}/{k}"] = value
+                                    aggregated_metrics[module_name][k].append(value)
+                                    aggregated_metrics["all"][k].append(value)
 
+                        aggregated_log = {}
+                        for module_name, metric_values in aggregated_metrics.items():
+                            for metric_name, values in metric_values.items():
+                                if values:
+                                    key = f"{module_name}/mean/{metric_name}"
+                                    aggregated_log[key] = sum(values) / len(values)
+
+                        acc_log = f" Train Acc@1: {train_acc_value:.4f}" if train_acc_value is not None else ""
                         logger.info(
                             f"(step={train_steps:07d}) " \
                             f"Train Loss: {avg_train_loss:.4f} " \
                             f"Train Steps/Sec: {steps_per_sec:.2f} " \
-                            f"Train Samples/Sec: {samples_per_sec:.1f}"
+                            f"Train Samples/Sec: {samples_per_sec:.1f}" \
+                            f"{acc_log}"
                         )
 
                         # Log training metrics to a separate table in wandb
@@ -579,12 +625,15 @@ def main(args):
                                 "train/step": train_steps,
                                 "train/lr": lr_scheduler.get_last_lr()[0],
                                 "train/samples_per_sec": samples_per_sec,
+                                **({"train/acc@1": train_acc_value} if train_acc_value is not None else {}),
                                 **{f"train/{k}": v for k, v in grad_log.items()},
                                 **{f"activation/{k}": v for k, v in buf_log.items()},
+                                **{f"activation/{k}": v for k, v in aggregated_log.items()},
                             }, step=train_steps)
-                    
+
                     # Reset tracking variables for the next logging interval
                     running_loss, log_steps = 0.0, 0
+                    running_correct, running_examples = 0.0, 0
                     start_time = time.time()
                 
                 # Save model checkpoint at regular intervals

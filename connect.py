@@ -2,12 +2,11 @@ import logging
 import random
 from typing import Optional, Sequence
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import List, Dict, Tuple, Any
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-import torch.compiler
 
 _METRICS = (
     "x_norm2", "f_par_norm2", "f_ortho_norm2",
@@ -20,7 +19,7 @@ N_TAG   = len(TAG2ID)
 
 @dataclass
 class ConnStat:
-    module_name  : str   # module name
+    module_name  : str   # module name (e.g. attn, mlp, conv)
     block_id     : int   # block id
     x_norm2      : float # residual stream scale
     f_par_norm2  : float # attention/MLP's x parallel component
@@ -31,10 +30,21 @@ class ConnStat:
 
     @classmethod
     def from_list(cls, t: list) -> "ConnStat":
-        module_name = t[0]
-        assert module_name in ID2TAG, f"Unknown module name: {module_name}"
+        module_id_or_name = t[0]
+        if isinstance(module_id_or_name, str):
+            assert module_id_or_name in TAG2ID, f"Unknown module name: {module_id_or_name}"
+            module_name = module_id_or_name
+        else:
+            module_idx = int(module_id_or_name)
+            assert module_idx in ID2TAG, f"Unknown module id: {module_idx}"
+            module_name = ID2TAG[module_idx]
+
         block_id = int(t[1])
         return cls(module_name, block_id, *t[2:])     # type: ignore
+
+    def metrics(self) -> Dict[str, float]:
+        """Return a dictionary of the scalar metrics stored in this object."""
+        return {k: getattr(self, k) for k in _METRICS}
 
 @dataclass
 class RawConnStat:
@@ -175,7 +185,7 @@ def connect(x: torch.Tensor, f_x: torch.Tensor, *,
     else:
         raise ValueError(f"unknown connect method: {method}")
 
-def _stats(results: RawConnStat) -> Tuple[torch.Tensor, ...]:
+def _stats(results: RawConnStat) -> Dict[str, torch.Tensor]:
     dim = results.dim
     eps = results.eps
     
@@ -218,18 +228,14 @@ def _stats(results: RawConnStat) -> Tuple[torch.Tensor, ...]:
     denom = torch.sqrt(x_norm2 * f_x_norm2)
     cos = dot / denom
 
-    stat = ConnStat(
-        module_name=None,
-        block_id=None,
-        x_norm2=x_norm2.mean().item(),  
-        f_par_norm2=f_par_norm2.mean().item(),
-        f_ortho_norm2=f_ortho_norm2.mean().item(),
-        rho_par=(f_par_norm2 / x_norm2).mean().item(),
-        rho_ortho=(f_ortho_norm2 / x_norm2).mean().item(),
-        cos_x_out=cos.mean().item(),
-    )
-    
-    return stat
+    return {
+        "x_norm2": x_norm2.mean().detach(),
+        "f_par_norm2": f_par_norm2.mean().detach(),
+        "f_ortho_norm2": f_ortho_norm2.mean().detach(),
+        "rho_par": (f_par_norm2 / x_norm2).mean().detach(),
+        "rho_ortho": (f_ortho_norm2 / x_norm2).mean().detach(),
+        "cos_x_out": cos.mean().detach(),
+    }
 
 def set_connect(
     module: torch.nn.Module,
@@ -291,9 +297,9 @@ class ConnLoggerMixin:
         self.log_activations = log_activations
         self.block_id = ConnLoggerMixin._global_block_id
         ConnLoggerMixin._global_block_id += 1
-        self._step_stats: List[ConnStat] = []
+        self._step_stats: List[Tuple[str, int, Dict[str, torch.Tensor]]] = []
 
-    # to read the step
+    # to read the step (kept for backward compatibility, currently unused)
     def set_step_fn(self, fn):
         self._get_step = fn
 
@@ -327,19 +333,24 @@ class ConnLoggerMixin:
         )
         stream = stream.to(x.dtype) # for AMP
         
-        if not torch.compiler.is_compiling():
-            if hasattr(self, "_get_step") and self.log_activations:
-                step = self._get_step()
-                if step % self.log_interval == 0 and isinstance(results, RawConnStat):
-                    with torch.no_grad():
-                        stat = _stats(results)
-                        stat.tag = tag
-                        stat.block_id = self.block_id
-                        self._step_stats.append(stat)
+        if self.log_activations and isinstance(results, RawConnStat):
+            with torch.no_grad():
+                values = _stats(results)
+                self._step_stats.append((tag, self.block_id, values))
         return stream
 
-    def pop_stats(self) -> list:
-        stats, self._step_stats = self._step_stats, []
+    def pop_stats(self, *, scalarize: bool = True) -> list:
+        cached = list(self._step_stats)
+        self._step_stats.clear()
+
+        if not scalarize:
+            return []
+
+        stats: List[ConnStat] = []
+        for tag, block_id, metrics in cached:
+            scalar_metrics = {k: v.item() for k, v in metrics.items()}
+            stats.append(ConnStat(module_name=tag, block_id=block_id, **scalar_metrics))
+
         return stats
 
 
