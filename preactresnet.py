@@ -195,11 +195,11 @@ class PreActResNet(nn.Module):
 
         return x
 
-    def pop_stats(self):
+    def pop_stats(self, *, scalarize: bool = True):
         all_stats = []
         for module in self.modules():
             if isinstance(module, ConnLoggerMixin):
-                all_stats.extend(module.pop_stats())
+                all_stats.extend(module.pop_stats(scalarize=scalarize))
         return all_stats
 
 

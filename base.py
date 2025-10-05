@@ -101,11 +101,11 @@ class Classifier(nn.Module):
 
         return logits
 
-    def pop_stats(self) -> list:
+    def pop_stats(self, *, scalarize: bool = True) -> list:
         all_stats = []
         for blk in self.blocks:
             if hasattr(blk, "pop_stats"):
-                all_stats.extend(blk.pop_stats())
+                all_stats.extend(blk.pop_stats(scalarize=scalarize))
         return all_stats
     
 
