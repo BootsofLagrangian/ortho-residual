@@ -23,7 +23,8 @@ class PreActBasic(ConnLoggerMixin, nn.Module):
         gradient_checkpointing="none",
         log_interval=50, log_activations=True, 
         residual_connection="identity", orthogonal_method="global",
-        residual_eps=1e-6, residual_perturbation=None
+        residual_eps=1e-6, residual_perturbation=None,
+        residual_pattern="default", residual_rescale_mode="scalar"
     ):
         nn.Module.__init__(self)
         ConnLoggerMixin.__init__(self,
@@ -48,9 +49,15 @@ class PreActBasic(ConnLoggerMixin, nn.Module):
             self.grad_ckpt = gradient_checkpointing
 
         self.register_buffer("residual_eps", torch.tensor(residual_eps, dtype=torch.float32))
+        pattern = (residual_pattern or "default").lower().replace("-", "_")
+        rescale_mode = (residual_rescale_mode or "scalar").lower().replace("-", "_")
         self._res_kwargs = dict(method=residual_connection,
                                 orthogonal_method=orthogonal_method,
-                                perturbation=residual_perturbation)
+                                perturbation=residual_perturbation,
+                                pattern=pattern)
+        if pattern == "rescale_stream":
+            self._res_kwargs["rescale_mode"] = rescale_mode
+        self._init_pattern_state(out_channels * PreActBasic.expansion, pattern, rescale_mode)
     def _forward_impl(self, x):
 
         res = self.residual(x)
@@ -73,6 +80,22 @@ class PreActBasic(ConnLoggerMixin, nn.Module):
                 _unsloth_fn, x
             )[0]
 
+    def _init_pattern_state(self, channel_dim: int, pattern: str, rescale_mode: str) -> None:
+        if pattern == "rezero":
+            self._pattern_params["conv_alpha"] = nn.Parameter(torch.zeros(1))
+        elif pattern == "rezero_constrained":
+            self._pattern_params["conv_theta"] = nn.Parameter(torch.zeros(1))
+        elif pattern == "rescale_stream":
+            if rescale_mode == "conv1x1":
+                proj = nn.Conv2d(channel_dim, channel_dim, kernel_size=1, bias=False)
+                nn.init.zeros_(proj.weight)
+                with torch.no_grad():
+                    for c in range(channel_dim):
+                        proj.weight[c, c, 0, 0] = 1.0
+                self._pattern_modules["conv_rescale_proj"] = proj
+            else:
+                self._pattern_params["conv_rescale_alpha"] = nn.Parameter(torch.zeros(1))
+
 class PreActBottleNeck(ConnLoggerMixin, nn.Module):
 
     expansion = 4
@@ -81,7 +104,8 @@ class PreActBottleNeck(ConnLoggerMixin, nn.Module):
         gradient_checkpointing="none",
         log_interval=50, log_activations=True, 
         residual_connection="identity", orthogonal_method="global",
-        residual_eps=1e-6, residual_perturbation=None
+        residual_eps=1e-6, residual_perturbation=None,
+        residual_pattern="default", residual_rescale_mode="scalar"
     ):
         nn.Module.__init__(self)
         ConnLoggerMixin.__init__(self,
@@ -112,9 +136,16 @@ class PreActBottleNeck(ConnLoggerMixin, nn.Module):
             self.grad_ckpt = gradient_checkpointing
 
         self.register_buffer("residual_eps", torch.tensor(residual_eps, dtype=torch.float32))
+        pattern = (residual_pattern or "default").lower().replace("-", "_")
+        rescale_mode = (residual_rescale_mode or "scalar").lower().replace("-", "_")
         self._res_kwargs = dict(method=residual_connection,
                                 orthogonal_method=orthogonal_method,
-                                perturbation=residual_perturbation)
+                                perturbation=residual_perturbation,
+                                pattern=pattern)
+        if pattern == "rescale_stream":
+            self._res_kwargs["rescale_mode"] = rescale_mode
+        channels = out_channels * PreActBottleNeck.expansion
+        self._init_pattern_state(channels, pattern, rescale_mode)
     
     def _forward_impl(self, x):
 
@@ -137,6 +168,22 @@ class PreActBottleNeck(ConnLoggerMixin, nn.Module):
             return Unsloth_Offloaded_Gradient_Checkpointer.apply(
                 _unsloth_fn, x
             )[0]
+
+    def _init_pattern_state(self, channel_dim: int, pattern: str, rescale_mode: str) -> None:
+        if pattern == "rezero":
+            self._pattern_params["conv_alpha"] = nn.Parameter(torch.zeros(1))
+        elif pattern == "rezero_constrained":
+            self._pattern_params["conv_theta"] = nn.Parameter(torch.zeros(1))
+        elif pattern == "rescale_stream":
+            if rescale_mode == "conv1x1":
+                proj = nn.Conv2d(channel_dim, channel_dim, kernel_size=1, bias=False)
+                nn.init.zeros_(proj.weight)
+                with torch.no_grad():
+                    for c in range(channel_dim):
+                        proj.weight[c, c, 0, 0] = 1.0
+                self._pattern_modules["conv_rescale_proj"] = proj
+            else:
+                self._pattern_params["conv_rescale_alpha"] = nn.Parameter(torch.zeros(1))
 
 class PreActResNet(nn.Module):
 

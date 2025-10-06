@@ -1,0 +1,61 @@
+project: debug
+dataset: cifar10
+
+# === Residual / Orthogonal settings ===
+# Set this true to actually use orthogonal residual connections instead of plain sum.
+# When false (default), residual_connection="linear" and you still CAN log activations if log_activations: true.
+orthogonal_residual: true
+# Method for orthogonal residual decomposition: one of [feature, global, negative].
+#  - feature: project per feature dim (default)
+#  - global: use a global projection basis
+#  - negative: negative branch variant
+orthogonal_method: feature
+residual_pattern: default
+residual_rescale_mode: scalar
+# Optional: choose only certain blocks to apply orthogonal residuals
+# Example pattern list indices (0-based). Uncomment to restrict.
+# orthogonal_pattern: "0,2,4"
+# Optional probabilistic gating each optimizer step (0~1). Uncomment to randomize.
+# orthogonal_prob: 0.5
+# model
+model: vit
+preset: S            # 384-dim, 6 layers, 6 heads
+drop_path: 0.0
+mlp_dropout: 0.0
+
+# optimization
+optimizer: adam
+global_batch_size: 1024
+grad_accumulate_steps: 1
+lr: 1.0e-3
+weight_decay: 0.0001
+epochs: 2
+warmup_epoch: 1
+lr_scheduler_type: cos
+grad_clip:
+
+# regularisation & aug
+use_mixup: true
+mixup_alpha: 0.8
+cutmix_alpha: 1.0
+mixup_prob: 1.0
+label_smoothing: 0.1
+random_erase: 0.25
+randaugment_N: 9
+randaugment_M: 5
+
+save_every_steps: 50000
+save_every_epochs: 300
+log_interval: 5
+
+use_amp: true
+torch_compile: true
+###############################################################################
+# Activation metric logging controls
+# log_activations: true  -> collect & log activation stats every log_interval steps.
+# (force per-forward collection removed) Stats now only gathered on optimizer steps divisible by log_interval.
+###############################################################################
+log_activations: true
+
+# If you want sparser logging just raise log_interval, e.g. 50 or 100.
+# log_interval: 50

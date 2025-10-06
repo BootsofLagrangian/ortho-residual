@@ -10,6 +10,7 @@ import random
 import argparse
 import os
 import math
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -53,6 +54,44 @@ def unwrap_model(m: torch.nn.Module) -> torch.nn.Module:
     if isinstance(m, torch.nn.parallel.DistributedDataParallel):
         m = m.module
     return getattr(m, "_orig_mod", m)
+
+
+def log_residual_patterns(logger: logging.Logger, module: torch.nn.Module) -> None:
+    """Emit residual pattern configuration details for modules that carry them."""
+    inspected = unwrap_model(module)
+    for name, child in inspected.named_modules():
+        params = getattr(child, "_pattern_params", None)
+        modules_dict = getattr(child, "_pattern_modules", None)
+        cfg = None
+        if hasattr(child, "residual_kwargs"):
+            cfg = getattr(child, "residual_kwargs")
+        elif hasattr(child, "_res_kwargs"):
+            cfg = getattr(child, "_res_kwargs")
+
+        has_params = isinstance(params, nn.ParameterDict) and len(params) > 0
+        has_modules = isinstance(modules_dict, nn.ModuleDict) and len(modules_dict) > 0
+        pattern = None
+        rescale_mode = None
+        if isinstance(cfg, dict):
+            pattern = cfg.get("pattern")
+            if pattern in (None, "default", "none") and not (has_params or has_modules):
+                continue
+            rescale_mode = cfg.get("rescale_mode")
+        elif not (has_params or has_modules):
+            continue
+
+        parts = [f"module={name or '<root>'}"]
+        if pattern:
+            parts.append(f"pattern={pattern}")
+        if rescale_mode:
+            parts.append(f"rescale_mode={rescale_mode}")
+        if has_params:
+            param_specs = [f"{key}{tuple(param.shape)}" for key, param in params.items()]
+            parts.append(f"params=[{', '.join(param_specs)}]")
+        if has_modules:
+            module_specs = [f"{key}:{modules_dict[key].__class__.__name__}" for key in modules_dict]
+            parts.append(f"modules=[{', '.join(module_specs)}]")
+        logger.info("Residual pattern details: %s", ", ".join(parts))
 
 
 def get_state_dict_for_save(m):
@@ -296,6 +335,8 @@ def main(args):
             orthogonal_method=args.orthogonal_method,
             residual_eps=args.orthogonal_eps,
             residual_perturbation=args.orthogonal_perturbation,
+            residual_pattern=args.residual_pattern,
+            residual_rescale_mode=args.residual_rescale_mode,
             # Activation & training logs share the same interval now
             log_interval=args.log_interval,
             log_activations=(rank == 0 and args.log_activations),
@@ -324,6 +365,8 @@ def main(args):
             orthogonal_method=args.orthogonal_method,
             residual_eps=args.orthogonal_eps,
             residual_perturbation=args.orthogonal_perturbation,
+            residual_pattern=args.residual_pattern,
+            residual_rescale_mode=args.residual_rescale_mode,
             modulate=False,
             mlp_dropout=args.mlp_dropout,
             # Activation & training logs share the same interval now
@@ -362,6 +405,7 @@ def main(args):
     model = DDP(base_model, device_ids=[local_rank])
     if rank == 0:
         logger.info(model.module)
+        log_residual_patterns(logger, model)
     if args.optimizer == "adam":
         betas = (args.adam_beta1, args.adam_beta2)
         optimizer = torch.optim.Adam(
@@ -732,6 +776,8 @@ if __name__ == "__main__":
                         help="Preset for model size: S (small), M (medium), L (large).")
     parser.add_argument("--orthogonal_residual", action="store_true",
                     help="Enable orthogonal residual connections if specified.")
+    parser.add_argument("--no_orthogonal_residual", action="store_false", dest="orthogonal_residual",
+                    help="Disable orthogonal residual connections (overrides config).")
     parser.add_argument("--orthogonal_prob", type=float, default=None,
                         help="Rate of orthogonal residual connections.")
     parser.add_argument("--orthogonal_method", type=str, choices=["negative", "feature", "global"],
@@ -743,6 +789,14 @@ if __name__ == "__main__":
                         help="Epsilon for orthogonal residual connections.")
     parser.add_argument("--orthogonal_perturbation", type=float, default=None,
                         help="Perturbation for orthogonal residual connections.")
+    parser.add_argument("--residual_pattern", type=str,
+                        choices=["default", "none", "rezero", "rezero_constrained", "rescale_stream"],
+                        default="default",
+                        help="Residual pattern variant to apply on top of the base connection method.")
+    parser.add_argument("--residual_rescale_mode", type=str,
+                        choices=["scalar", "conv1x1"],
+                        default="scalar",
+                        help="Mode for the rescale_stream pattern (scalar multiplier or 1x1 convolution).")
     parser.add_argument("--mlp_dropout", type=float, default=0.0)
     parser.add_argument("--drop_path", type=float, default=0.0)
     parser.add_argument("--is_layernorm_classifier", action="store_true",
@@ -833,16 +887,18 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true",
                     help="Print verbose debug logs.")
 
-    
-    args = parser.parse_args()
-    
-    if args.config_file:
-        import yaml
-        with open(args.config_file, 'r') as f:
-            config = yaml.safe_load(f)
+    import yaml
+
+    preliminary_args, _ = parser.parse_known_args()
+    if preliminary_args.config_file:
+        with open(preliminary_args.config_file, 'r') as f:
+            config = yaml.safe_load(f) or {}
         for key, value in config.items():
-            if hasattr(args, key):
-                setattr(args, key, value)
+            if hasattr(preliminary_args, key):
+                if key != "config_file":
+                    parser.set_defaults(**{key: value})
             else:
                 print(f"Warning: {key} not found in args.")
+
+    args = parser.parse_args()
     main(args)

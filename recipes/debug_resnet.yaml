@@ -10,30 +10,36 @@ orthogonal_residual: true
 #  - global: use a global projection basis
 #  - negative: negative branch variant
 orthogonal_method: feature
+# Additional residual-connection pattern controls
+residual_pattern: default
+residual_rescale_mode: scalar
 # Optional: choose only certain blocks to apply orthogonal residuals
 # Example pattern list indices (0-based). Uncomment to restrict.
 # orthogonal_pattern: "0,2,4"
 # Optional probabilistic gating each optimizer step (0~1). Uncomment to randomize.
 # orthogonal_prob: 0.5
 # model
-model: vit
+model: resnet18
 preset: S            # 384-dim, 6 layers, 6 heads
 drop_path: 0.0
 mlp_dropout: 0.0
 
 # optimization
-optimizer: adam
-global_batch_size: 1024
+optimizer: sgd
+momentum: 0.9
+global_batch_size: 128
 grad_accumulate_steps: 1
-lr: 1.0e-3
-weight_decay: 0.0001
-epochs: 2
-warmup_epoch: 1
-lr_scheduler_type: cos
-grad_clip:
+lr: 1.0e-1
+weight_decay: 0.0005
+epochs: 200
+warmup_epoch: 0
+lr_scheduler_type: step
+lr_scheduler_decay_epoch: 80,120
+lr_scheduler_decay_ratio: 0.2
+grad_clip: 1.0
 
 # regularisation & aug
-use_mixup: true
+use_mixup: false
 mixup_alpha: 0.8
 cutmix_alpha: 1.0
 mixup_prob: 1.0

@@ -55,6 +55,11 @@ Without this flag, the models will use standard linear residual updates by defau
 
 - You can also specify the type of orthogonalization (e.g., feature or global) via `--orthogonal_method feature`, `--orthogonal_method global`. `feature` (feature-wise, also known as Orthogonal-F in the paper) is the default.
 
+#### Command-line tips
+
+- **Config overrides**: Values loaded through `--config_file` act as defaults. Any CLI flag supplied afterwards (for instance `--orthogonal_method global`) wins over the YAML entry.
+- **Disabling orthogonal updates**: If a recipe already enables orthogonal residuals, pass `--no_orthogonal_residual` to revert to standard residual connections without editing the recipe file.
+
 - Predefined Recipes / Config Files:We provide several predefined configuration files (recipes) in the configs/ directory for reproducing the key results reported in our paper.
 
 For example, to train ViT-S with Orthogonal Residual Updates on Tiny ImageNet

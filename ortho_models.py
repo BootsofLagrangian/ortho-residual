@@ -16,10 +16,12 @@ class OrthoBlock(ConnLoggerMixin, nn.Module):
         hidden_size, 
         num_heads,
         mlp_ratio=4.0,
-        residual_connection="orthogonal",
-        orthogonal_method="global",
+    residual_connection="orthogonal",
+    orthogonal_method="global",
         residual_eps=1e-6,
         residual_perturbation=None,
+    residual_pattern="default",
+    residual_rescale_mode="scalar",
         modulate=True,
         mlp_dropout=0.0,
         drop_path=0.0,
@@ -48,14 +50,21 @@ class OrthoBlock(ConnLoggerMixin, nn.Module):
             torch.tensor([residual_eps], dtype=torch.float32)
         )
 
+        pattern = (residual_pattern or "default").lower().replace("-", "_")
+        rescale_mode = (residual_rescale_mode or "scalar").lower().replace("-", "_")
         self.residual_kwargs = {
             "method": residual_connection,
             "orthogonal_method": orthogonal_method,
             "perturbation": residual_perturbation,
+            "pattern": pattern,
         }
+        if pattern == "rescale_stream":
+            self.residual_kwargs["rescale_mode"] = rescale_mode
         if gradient_checkpointing:
             assert gradient_checkpointing in ("none", "torch", "unsloth"), "gradient_checkpointing should be one of 'none', 'torch', or 'unsloth'"
             self.grad_ckpt = gradient_checkpointing
+
+        self._init_pattern_state(hidden_size, pattern, rescale_mode)
 
 
     def set_step_fn(self, fn):      # 한 번만 호출
@@ -92,3 +101,16 @@ class OrthoBlock(ConnLoggerMixin, nn.Module):
             tag="mlp", eps=self.residual_eps, **self.residual_kwargs
         )
         return x
+
+    def _init_pattern_state(self, hidden_size: int, pattern: str, rescale_mode: str) -> None:
+        if pattern == "rezero":
+            self._pattern_params["attn_alpha"] = nn.Parameter(torch.zeros(1))
+            self._pattern_params["mlp_alpha"] = nn.Parameter(torch.zeros(1))
+        elif pattern == "rezero_constrained":
+            self._pattern_params["attn_theta"] = nn.Parameter(torch.zeros(1))
+            self._pattern_params["mlp_theta"] = nn.Parameter(torch.zeros(1))
+        elif pattern == "rescale_stream":
+            if rescale_mode != "scalar":
+                raise ValueError("residual_rescale_mode='conv1x1' is not supported for ViT blocks")
+            self._pattern_params["attn_rescale_alpha"] = nn.Parameter(torch.zeros(1))
+            self._pattern_params["mlp_rescale_alpha"] = nn.Parameter(torch.zeros(1))
