@@ -1,117 +1,86 @@
-# Orthogonal Residual + Radial SDE (Chi)
+# Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks
 
-Geometry-aware residual connections for stable + expressive representations.
+📢 Accepted at NeurIPS 2025 (Poster)
 
-This repo started as an Orthogonal Residual Update (ORU) baseline and is reorganized to run **Neural SDE-style residual dynamics** as the *main* experiment:
+This repository provides the official PyTorch implementation for the paper:
+[Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks
+](https://arxiv.org/abs/2505.11881)
 
-**Angular (surface)**: orthogonal/tangent update `f_perp(x)`  
-**Radial (thickness)**: learnable `(alpha, beta)` controlling radial drift/noise toward a chi / isotropic Gaussian radius.
+🚀 Try our pretrained on ImageNet-1k **OrthoViT-B** model directly via [Hugging Face](https://huggingface.co/BootsofLagrangian/ortho-vit-b-imagenet1k-hf).
 
-> Note: we implement the **Euler–Maruyama discretization** directly in PyTorch; `torchsde` is not required for the fixed-depth (ViT/ResNet) setting.
+## Abstract
 
-## TL;DR
+Residual connections are pivotal for deep neural networks, enabling greater depth by mitigating vanishing gradients. However, in standard residual updates, the module's output is directly added to the input stream. This can lead to updates that predominantly reinforce or modulate the existing stream direction, potentially underutilizing the module's capacity for learning entirely novel features. In this work, we introduce _Orthogonal Residual Update_: we decompose the module's output relative to the input stream and add only the component orthogonal to this stream. This design aims to guide modules to contribute primarily new representational directions, fostering richer feature learning while promoting more efficient training. We demonstrate that our orthogonal update strategy improves generalization accuracy and training stability across diverse architectures (ResNetV2, Vision Transformers) and datasets (CIFARs, TinyImageNet, ImageNet-1k), achieving, for instance, a +4.3\%p top-1 accuracy gain for ViT-B on ImageNet-1k.
 
-We replace the usual residual connection
+## Method Overview
 
-`x <- x + f(x)`
+Our core idea is to modify the standard residual update $x_{n+1} = x_n + f(\sigma(x_n))$ by projecting out the component of $f(\sigma(x_n))$ that is parallel to $x_n$. The update then becomes $x_{n+1} = x_n + f_{\perp}(x_n)$, where $f_{\perp}(x_n)$ is the component of $f(\sigma(x_n))$ orthogonal to $x_n$.
 
-with a geometry-aware update
+![Figure 1: Intuition behind Orthogonal Residual Update](img/figure1.jpg)
+*Figure 1: (Left) Standard residual update. (Right) Our Orthogonal Residual Update, which discards the parallel component $f_{||}$ and adds only the orthogonal component $f_{\perp}$.*
 
-`x <- x + f_perp(x) + ( radial drift + radial noise ) * u`
+This approach aims to ensure that each module primarily contributes new information to the residual stream, enhancing representational diversity and mitigating potential interference from updates that merely rescale or oppose the existing stream.
 
-where `u = x / (|x| + eps)` and `f_perp(x)` removes the component of `f(x)` parallel to `x`.
+## Key Results: Stable and Efficient Learning
 
-### Final update rule (per token / per feature-vector)
+Our Orthogonal Residual Update strategy leads to more stable training dynamics and improved learning efficiency. For example, models trained with our method often exhibit faster convergence to better generalization performance, as illustrated by comparative training curves.
 
-Let `r = |x|`, `u = x / (r + eps)`, and `d` be the feature dimension.
+![Figure 2: Training Dynamics and Efficiency Comparison](img/figure2.jpg)
+*Figure 2: Example comparison (e.g., ViT-B on ImageNet-1k) showing Orthogonal Residual Update (blue) achieving lower training loss and higher validation accuracy in less wall-clock time compared to linear residual updates (red).*
 
-```
-f_perp(x) = f(x) - <x,f(x)>/(|x|^2+eps) * x
-Δr_drift  = α * ((d-1)/(r+eps) - r/σ^2)
-Δr_noise  = β * ξ,   ξ ~ N(0,1)
-Δx_rad    = (Δr_drift + Δr_noise) * u
-```
+## Requirements
+- Python 3.8+
+- PyTorch 
+- torchvision
 
-Final:
-
-`x <- x + f_perp(x) + Δx_rad`
-
-### Why learnable `(alpha,beta)`?
-
-We treat radial shaping as a **soft, diagnostic constraint**:
-- if the task wants thin-sphere behavior, it can push `alpha,beta -> 0`
-- if the task benefits from controlled norm freedom (gating / confidence / saliency signals), it can keep non-zero radial dynamics
-
-## Repository structure
-
-```
-.
-├─ connect/                 # residual connect API + logging
-├─ models/                  # ViT / ResNet blocks
-├─ data/                    # datasets + transforms
-├─ configs/                 # YAML configs (toy target: ViT-S/CIFAR10)
-│  └─ optional/             # optional schedules/ablations
-├─ scripts/                 # train helpers
-├─ docs/                    # baseline ORU README kept here
-└─ train_classifier.py      # main entrypoint (supervised toy)
-```
-
-## Quickstart (ViT-S / CIFAR10)
-
-Install:
+Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-### Baselines
+## Training
 
-- Linear residual:
-```bash
-bash scripts/train_vit_s_cifar10_linear.sh
-```
-
-- Orthogonal residual (ORU):
-```bash
-bash scripts/train_vit_s_cifar10_orthogonal.sh
-```
-
-### Main: SDE-style residual dynamics
+We use torchrun for distributed training.General
 
 ```bash
-bash scripts/train_vit_s_cifar10_sde.sh
+torchrun --nproc-per-node [N_GPU] train_classifier.py --config_file [path_to_config_file] [additional_options]
 ```
 
-Config: `configs/vit_s_cifar10_sde.yaml`
-- `residual_connection: sde`
-- `sde_trainable: true` (learn `(alpha,beta)` per block/branch)
-- `sde_noise_mode: train|always|off`
+### Arguments
+- N_GPU: Number of GPUs to use for training
+- train_classifier.py: Main training script
+- --config_file [path_to_config_file]: Path to the YAML or Python configuration file specifying model, dataset, and training parameters
+- Activating Orthogonal Residual Updates: To enable our Orthogonal Residual Update mechanism, add the following flag to the training command `--orthogonal_residual`.
+Without this flag, the models will use standard linear residual updates by default. 
 
-### Optional (not main): ORU → Linear schedule
+- You can also specify the type of orthogonalization (e.g., feature or global) via `--orthogonal_method feature`, `--orthogonal_method global`. `feature` (feature-wise, also known as Orthogonal-F in the paper) is the default.
 
-This is kept for reference only:
-```bash
-bash scripts/train_vit_s_cifar10_ortho_to_linear.sh
+#### Command-line tips
+
+- **Config overrides**: Values loaded through `--config_file` act as defaults. Any CLI flag supplied afterwards (for instance `--orthogonal_method global`) wins over the YAML entry.
+- **Disabling orthogonal updates**: If a recipe already enables orthogonal residuals, pass `--no_orthogonal_residual` to revert to standard residual connections without editing the recipe file.
+
+- Predefined Recipes / Config Files:We provide several predefined configuration files (recipes) in the configs/ directory for reproducing the key results reported in our paper.
+
+For example, to train ViT-S with Orthogonal Residual Updates on Tiny ImageNet
+`torchrun --nproc-per-node [N_GPU] train_classifier.py --config_file configs/vit_s_tiny.yaml --orthogonal_residual
+`
+
+## Results
+Our method demonstrates consistent improvements across various models and datasets. For detailed results, please refer to our paper, particularly Table 2 (main results) and ablation studies in Section 4.
+
+## Citation
+If you find this work useful for your research, please consider citing our paper:
+
 ```
-
-Config: `configs/optional/vit_s_cifar10_ortho_to_linear.yaml`
-
-## What gets logged (for dynamics analysis)
-
-During training, we log per-block activation/connection stats to W&B under `activation/…`:
-- `x_norm2`, `f_par_norm2`, `f_ortho_norm2`, `rho_par`, `rho_ortho`, `cos_x_out`
-- SDE (when enabled): `sde_alpha`, `sde_beta`, `sde_r_mean`, `sde_r_std`, `sde_entropy_mean`, `sde_restoring_mean`, `sde_rho_rad`, …
-
-These are meant to answer questions like:
-- does the model keep a thin sphere (orthogonal-only) or develop thickness (SDE)?
-- which layers/branches keep `alpha,beta` active vs collapse them to ~0?
-- how does radial injection trade off with downstream accuracy/stability?
-
-You can also inspect learned `alpha/beta` scalars from a checkpoint:
-```bash
-python scripts/inspect_sde_params.py --checkpoint path/to/checkpoints/0005000.pt
+@article{oh2025revisiting,
+      title={Revisiting Residual Connections: Orthogonal Updates for Stable and Efficient Deep Networks}, 
+      author={Giyeong Oh and Woohyun Cho and Siyeol Kim and Suhwan Choi and Youngjae Yu},
+      year={2025},
+      journal={arXiv preprint arXiv:2505.11881},
+      eprint={2505.11881},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2505.11881}
+}
 ```
-
-## Notes
-
-- If you need the original ORU baseline README, see `docs/ORTHO_RESIDUAL_BASELINE.md`.
-- This repo’s “SDE” claim is **discretized dynamics** (Euler–Maruyama residual blocks), not a continuous-time solver setup.
